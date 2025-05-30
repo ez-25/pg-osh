@@ -13,7 +13,8 @@ import Highcharts from 'highcharts';
 export const getChartOptions = (
   period,
   data,
-  onPointClick
+  onPointClick,
+  selectedPoints = [] // selectedPoints 파라미터 추가 및 기본값 설정
 ) => {
   // dateTimeLabelFormats는 xAxis.type이 'datetime'일 때 사용되지만,
   // 현재 xAxis.type이 'category'이므로 직접적인 영향은 없습니다.
@@ -105,37 +106,9 @@ export const getChartOptions = (
         point: {
           events: {
             click: function () {
-              // 'this' is the Highcharts Point object. 'this.x' is the timestamp.
-              // Find the original data point by comparing timestamps.
-              // Need to parse d.date to a timestamp for comparison.
-              const clickedTimestamp = this.x;
-              const originalPoint = data.find(d => {
-                let pointTimestamp;
-                if (period === 'daily') {
-                  pointTimestamp = new Date(d.date).getTime();
-                } else if (period === 'weekly') {
-                  const [year, weekPart] = d.date.split('-W');
-                  if (year && weekPart) {
-                    const weekNum = parseInt(weekPart);
-                    // Get the Monday of that week (ISO 8601 week date)
-                    const jan4 = new Date(parseInt(year), 0, 4); // Jan 4th is always in week 1
-                    const firstMonday = new Date(jan4.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1));
-                    pointTimestamp = new Date(firstMonday.setDate(firstMonday.getDate() + (weekNum - 1) * 7)).getTime();
-                  } else {
-                     pointTimestamp = new Date(d.date).getTime(); // Fallback if format is unexpected
-                  }
-                } else if (period === 'monthly') {
-                  pointTimestamp = new Date(d.date + '-01').getTime(); // First day of the month
-                } else if (period === 'yearly') {
-                  pointTimestamp = new Date(d.date + '-01-01').getTime(); // First day of the year
-                } else {
-                  pointTimestamp = new Date(d.date).getTime(); // Default fallback
-                }
-                return pointTimestamp === clickedTimestamp && d.value === this.y;
-              });
-
-              if (originalPoint) {
-                onPointClick(originalPoint);
+              // 'this.options.originalData'를 사용하여 원래 데이터 객체에 접근
+              if (this.options && this.options.originalData) {
+                onPointClick(this.options.originalData);
               }
             },
           },
@@ -147,31 +120,41 @@ export const getChartOptions = (
         name: 'USD/KRW',
         type: 'line',
         data: data.map(d => {
+          const isSelected = selectedPoints.some(
+            (sp) => sp.date === d.date && sp.value === d.value
+          );
           let timestamp;
           if (period === 'daily') {
             timestamp = new Date(d.date).getTime();
           } else if (period === 'weekly') {
-            // 'YYYY-Www' format. Get timestamp for the start of that week (Monday).
             const [year, weekPart] = d.date.split('-W');
             if (year && weekPart) {
                 const weekNum = parseInt(weekPart);
-                // Jan 4th is always in week 1. Find Monday of week 1.
                 const jan4 = new Date(parseInt(year), 0, 4);
                 const firstMondayOfYear = new Date(jan4.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1));
-                // Add (weekNum - 1) weeks to the first Monday.
                 timestamp = new Date(firstMondayOfYear.setDate(firstMondayOfYear.getDate() + (weekNum - 1) * 7)).getTime();
             } else {
-                // Fallback for unexpected week format, though data should be consistent
                 timestamp = new Date(d.date).getTime();
             }
           } else if (period === 'monthly') {
-            timestamp = new Date(d.date + '-01').getTime(); // Use first day of the month
+            timestamp = new Date(d.date + '-01').getTime();
           } else if (period === 'yearly') {
-            timestamp = new Date(d.date + '-01-01').getTime(); // Use first day of the year
+            timestamp = new Date(d.date + '-01-01').getTime();
           } else {
-            timestamp = new Date(d.date).getTime(); // Fallback, should not happen
+            timestamp = new Date(d.date).getTime();
           }
-          return [timestamp, d.value];
+          return {
+            x: timestamp,
+            y: d.value,
+            marker: {
+              enabled: true,
+              radius: isSelected ? 6 : 3,
+              fillColor: isSelected ? 'yellow' : '#28a745',
+              lineWidth: isSelected ? 2 : 0,
+              lineColor: isSelected ? Highcharts.getOptions().colors[0] : '#28a745', // Or a specific border color for selected
+            },
+            originalData: d // Store original data object with the point
+          };
         }),
       },
     ],

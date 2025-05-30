@@ -18,7 +18,7 @@ export default function WonDollarChartPage() { // 함수 이름 변경 제안 (�
   const [selectedPeriod, setSelectedPeriod] = useState('daily'); // 타입 어노테이션 제거
   const [chartData, setChartData] = useState([]); // 타입 어노테이션 제거
   const [selectedPoints, setSelectedPoints] = useState([]); // 타입 어노테이션 제거
-  const [comparisonData, setComparisonData] = useState([]); // 타입 어노테이션 제거
+  const [comparisonData, setComparisonData] = useState(null); // 변경: 단일 객체 또는 null
   const [isLoading, setIsLoading] = useState(true); // 타입 어노테이션 제거
   const [error, setError] = useState(null); // 타입 어노테이션 제거
 
@@ -46,7 +46,7 @@ export default function WonDollarChartPage() { // 함수 이름 변경 제안 (�
 
     loadData();
     setSelectedPoints([]); // 기간 변경 시 선택된 포인트 초기화
-    setComparisonData([]); // 기간 변경 시 비교 데이터 초기화
+    setComparisonData(null); // 변경: 기간 변경 시 비교 데이터 초기화
   }, [selectedPeriod]);
 
   /**
@@ -56,6 +56,17 @@ export default function WonDollarChartPage() { // 함수 이름 변경 제안 (�
    */
   const handlePointClick = useCallback((pointData) => { // 타입 어노테이션 제거
     setSelectedPoints((prevSelectedPoints) => {
+      // 이미 선택된 포인트인지 확인 (date와 value 모두 비교)
+      const isAlreadySelected = prevSelectedPoints.some(
+        (p) => p.date === pointData.date && p.value === pointData.value
+      );
+
+      if (isAlreadySelected) {
+        // 이미 선택된 포인트면, 해당 포인트를 선택 해제 (선택적으로 구현 가능, 여기서는 중복 선택 방지)
+        // return prevSelectedPoints.filter(p => !(p.date === pointData.date && p.value === pointData.value));
+        return prevSelectedPoints; // 중복 선택 방지
+      }
+
       const newSelectedPoints = [...prevSelectedPoints, pointData];
       if (newSelectedPoints.length === 2) {
         const p1 = newSelectedPoints[0];
@@ -69,8 +80,10 @@ export default function WonDollarChartPage() { // 함수 이름 변경 제안 (�
             date2: p2.date,
             value2: p2.value,
             differencePercent: `${diff.toFixed(2)}%`,
+            absoluteDifference: (p2.value - p1.value).toFixed(2) // 절대 차이 추가
           };
-          setComparisonData((prev) => [...prev, newComparison]);
+          // setComparisonData((prev) => [...prev, newComparison]); // 변경 전
+          setComparisonData(newComparison); // 변경: 새 비교 데이터로 교체
         }
         return []; // 다음 비교를 위해 선택 초기화
       }
@@ -78,7 +91,7 @@ export default function WonDollarChartPage() { // 함수 이름 변경 제안 (�
     });
   }, []);
 
-  const chartOptions = getChartOptions(selectedPeriod, chartData, handlePointClick);
+  const chartOptions = getChartOptions(selectedPeriod, chartData, handlePointClick, selectedPoints);
 
   return (
     <div style={{ padding: '20px' }}>
@@ -107,6 +120,7 @@ export default function WonDollarChartPage() { // 함수 이름 변경 제안 (�
          <p>선택된 기간에 대한 데이터가 없습니다.</p>
       )}
 
+      {/*
       <h2>데이터 테이블 ({
         selectedPeriod === 'daily' ? '일별' :
         selectedPeriod === 'weekly' ? '주별' :
@@ -118,8 +132,9 @@ export default function WonDollarChartPage() { // 함수 이름 변경 제안 (�
       ) : (
         !isLoading && !error && <p>테이블에 표시할 데이터가 없습니다.</p>
       )}
+      */}
 
-      {comparisonData.length > 0 && (
+      {comparisonData && ( // 변경: comparisonData가 null이 아닐 때만 렌더링
         <>
           <h2>비교 결과</h2>
           <ComparisonTable data={comparisonData} />
